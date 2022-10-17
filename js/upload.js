@@ -551,3 +551,83 @@ const delay = function delay (interval) {
     });
 
 })();
+
+/* 拖拽上传 */
+(function () {
+    let upload = document.querySelector('#upload6'),
+        upload_inp = upload.querySelector('.upload_inp'),
+        upload_submit = upload.querySelector('.upload_submit'),
+        upload_mark = upload.querySelector('.upload_mark'),
+        upload_mark_span = upload_mark.querySelector('span');
+
+    // 是否正在上传中
+    let isRun = false;
+
+    // 实现文件上传
+    const uploadFile = async file => {
+        if (isRun) return;
+        isRun = true;
+        upload_mark.style.display = 'block';
+        try {
+            let formData = new FormData(),
+                data;
+            formData.append('file', file);
+            formData.append('filename', file.name);
+            data = await instance.post('/upload_single', formData, {
+                onUploadProgress: ev => {
+                    let {
+                        loaded,
+                        total
+                    } = ev;
+                   upload_mark_span.innerHTML = ((loaded / total * 100).toFixed()) + "%"
+                }
+            });
+            if (+data.code === 0) {
+                upload_mark_span.innerHTML = '100%';
+                await delay(300);
+                alert(`恭喜你，文件上传成功，您可以基于 ${data.servicePath} 访问该文件~~`);
+                return;
+            }
+            throw data.codeText;
+        } catch (err) {
+            alert('很遗憾，文件上传失败，请您稍后再试~~');
+        } finally {
+            upload_mark.style.display = 'none';
+            upload_mark_span.innerHTML = '';
+            isRun = false;
+        }
+    }
+
+    // 拖拽获取 dragenter dragleave dragover drop
+
+    upload.addEventListener('dragenter', function () {
+        console.log('进入');
+    })
+    upload.addEventListener('dragleave', function () {
+        console.log('离开');
+    })
+    upload.addEventListener('dragover', function (ev) {
+        ev.preventDefault();
+        console.log('区域内移动');
+    })
+    upload.addEventListener('drop', function (ev) {
+        ev.preventDefault();
+        let file = ev.dataTransfer.files[0];
+        if (!file) return;
+        uploadFile(file);
+        console.log('放置到容器中');
+    })
+
+
+
+    upload_inp.addEventListener('change', function () {
+        let file = upload_inp.files[0];
+        if (!file) return;
+        uploadFile(file)
+    })
+
+    upload_submit.addEventListener('click', function () {
+        upload_inp.click();
+    });
+
+})();
