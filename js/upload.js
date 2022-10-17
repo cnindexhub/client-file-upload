@@ -631,3 +631,171 @@ const delay = function delay (interval) {
     });
 
 })();
+
+/* 进度管控 */
+(function () {
+    let upload = document.querySelector('#upload7'),
+        upload_inp = upload.querySelector('.upload_inp'),
+        upload_button_select = upload.querySelector('.upload_button.select'),
+        upload_progress = upload.querySelector('.upload_progress'),
+        upload_progress_value = upload_progress.querySelector('.value');
+
+    // 根据文件内容生成HASH、filename、fileBuffer、fileSuffix
+    const changeBuffer = file => {
+        return new Promise(resolve =>  {
+            let fileReader = new FileReader();
+            fileReader.readAsArrayBuffer(file);
+            fileReader.onload = ev => {
+                let buffer = ev.target.result,
+                    speak = new SparkMD5.ArrayBuffer(),
+                    HASH,
+                    suffix;
+                speak.append(buffer);
+                HASH = speak.end();
+                suffix = /\.([a-zA-z0-9]+)$/.exec(file.name)[1];
+                resolve({
+                    buffer,
+                    HASH,
+                    suffix,
+                    filename:`${HASH}.${suffix}`
+                });
+            }
+        });
+    }
+
+    // 验证是否处于可操作状态
+    const checkDisable = element => {
+        let classList = element.classList;
+        return classList.contains('loading') || classList.contains('disable');
+    }
+
+    // 点击选择文件按钮触发上传文件的input框
+    upload_button_select.addEventListener('click', function () {
+        if (checkDisable(this)) {
+            return;
+        }
+        upload_inp.value = '';
+        upload_inp.click();
+    });
+
+    // 监听文件选择事件
+    upload_inp.addEventListener("change", async function () {
+        // 获取用户选择的文件
+        let file = upload_inp.files[0];
+        if (!file) return;
+        upload_button_select.classList.add('loading');
+        upload_progress.style.display = 'block';
+
+        let data,
+            max = 1024 * 100, // 默认切片大小
+            count = Math.ceil(file.size / max); // 切片数量
+        // 最大切片数量为100
+        if (count > 100) {
+            max = file.size / 100;
+            count = 100;
+        }
+
+        // 生成HASH，suffix,
+        let alreadys = [], // 已经上传的切片
+            index = 0, // 上传的切片下标
+            chunks = [], // 所有切片
+        {
+            HASH,suffix
+        } = await changeBuffer(file);
+
+        console.log(file)
+
+        // 生成切片
+        while (index < count) {
+            // index 0 0 ~ max
+            // index 1 index * max ~ index + 1 * max
+            // index 2 index * max ~ index + 1 * max
+            chunks.push({
+                file: file.slice(index * max, (index + 1) * max),
+                filename: `${HASH}_${index+1}.${suffix}`
+            })
+
+            index ++;
+        }
+
+
+
+        // 获取已经上传的切片
+        try{
+           data = await instance.get('/upload_already',{
+                params:{
+                    HASH
+                }
+            });
+           if (+data.code === 0) {
+               alreadys = data.fileList;
+           }
+        } catch (err) {}
+        index = 0;
+        const compute = async () => {
+            index ++;
+            // 计算进度
+            let progress = index / count * 100;
+            upload_progress_value.style.width = `${progress}%`;
+            // 是否合并，合并分片
+            if (index < count) return;
+            upload_progress_value.style.width = '100%';
+            try {
+                data = await instance.post('/upload_merge', {
+                    HASH: HASH,
+                    count: count
+                }, {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                })
+                if (+data.code === 0) {
+                    delay(300);
+                    alert(`恭喜您，分片合并成功，您可以基于 ${data.servicePath} 访问该文件~~`)
+                    clear();
+                    return;
+                }
+                throw data.codeText;
+            } catch (err) {
+                alert('分片合并失败，请稍后再试!')
+                clear();
+            } finally {
+                clear();
+            }
+
+
+        }
+
+        chunks.forEach(chuck => {
+
+            if (alreadys.length > 0 && alreadys.includes(chuck.filename)) {
+                compute();
+                return;
+            }
+            let fm = new FormData()
+            fm.append('file', chuck.file);
+            fm.append('filename', chuck.filename);
+            instance.post('/upload_chunk', fm).then(data => {
+                 if (+data.code === 0) {
+                     compute();
+                     return;
+                 }
+                 Promise.reject(data.codeText);
+            }).catch(() => {
+                alert('分片上传失败，请稍后再试~~');
+                clear();
+            })
+
+        })
+
+
+
+    });
+
+    const clear = () => {
+        upload_button_select.classList.remove('loading');
+        upload_progress.style.display = 'none';
+        upload_progress_value.style.width = '0%';
+    }
+
+})();
