@@ -7,6 +7,17 @@ instance.defaults.transformRequest = (data, headers) => {
     if (contentType === "application/x-www-form-urlencoded") return Qs.stringify(data);
     return data;
 }
+instance.interceptors.request.use(request => {
+    let date = new Date();
+    let url = request.url;
+    url = url.indexOf('&') != -1 ? url + `&no_cache=${date.getTime()}` : url + `?no_cache=${date.getTime()}`;
+    request.url = url;
+    return request;
+}, reason => {
+    // 统一异常处理
+    // ...
+    return Promise.reject(reason);
+})
 instance.interceptors.response.use(response => {
     return response.data;
 }, reason => {
