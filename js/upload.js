@@ -696,7 +696,7 @@ const delay = function delay (interval) {
         }
 
         // 生成HASH，suffix,
-        let alreadys = [], // 已经上传的切片
+        let aleady = [], // 已经上传的切片
             index = 0, // 上传的切片下标
             chunks = [], // 所有切片
         {
@@ -728,7 +728,8 @@ const delay = function delay (interval) {
                 }
             });
            if (+data.code === 0) {
-               alreadys = data.fileList;
+               aleady = data.fileList;
+               console.log(aleady)
            }
         } catch (err) {}
         index = 0;
@@ -741,6 +742,7 @@ const delay = function delay (interval) {
             if (index < count) return;
             upload_progress_value.style.width = '100%';
             try {
+                delay(300);
                 data = await instance.post('/upload_merge', {
                     HASH: HASH,
                     count: count
@@ -750,7 +752,6 @@ const delay = function delay (interval) {
                     }
                 })
                 if (+data.code === 0) {
-                    delay(300);
                     alert(`恭喜您，分片合并成功，您可以基于 ${data.servicePath} 访问该文件~~`)
                     clear();
                     return;
@@ -768,7 +769,7 @@ const delay = function delay (interval) {
 
         chunks.forEach(chuck => {
 
-            if (alreadys.length > 0 && alreadys.includes(chuck.filename)) {
+            if (aleady.length > 0 && aleady.includes(chuck.filename)) {
                 compute();
                 return;
             }
